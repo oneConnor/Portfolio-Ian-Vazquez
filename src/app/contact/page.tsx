@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, GitBranch, Mail, ShoppingBag } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, GitBranch, Mail, ShoppingBag } from "lucide-react";
 import { ContactForm } from "@/components/forms/ContactForm";
 import { Container } from "@/components/ui/Container";
 import { personal } from "@/lib/data/personal";
@@ -92,6 +92,19 @@ export async function ContactPage({ searchParams }: ContactPageProps) {
               <span>
                 <span className="block text-sm font-semibold">Fiverr</span>
                 <span className="block text-sm text-muted-foreground">Fiverr</span>
+              </span>
+            </a>
+
+            <a
+              href={personal.social.cal.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-foreground transition-colors hover:border-border-hover hover:bg-muted"
+            >
+              <CalendarClock className="size-5 text-accent" aria-hidden="true" />
+              <span>
+                <span className="block text-sm font-semibold">cal.com</span>
+                <span className="block text-sm text-muted-foreground">Agendá una llamada</span>
               </span>
             </a>
           </div>

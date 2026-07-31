@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { CVDownloadButton } from "@/components/content/CVDownloadButton";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -14,7 +15,14 @@ export function Header() {
           className="inline-flex min-h-11 items-center rounded-full text-h3 font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label="Ir al inicio"
         >
-          {personal.logo}
+          <Image
+            src={personal.logo}
+            alt={personal.displayName}
+            width={80}
+            height={80}
+            className="rounded-full"
+            priority
+          />
         </Link>
         <div className="hidden items-center gap-3 md:flex">
           <Navigation />

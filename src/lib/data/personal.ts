@@ -9,7 +9,7 @@ export const personal = {
   title: "Full Stack Developer",
   location: "Buenos Aires, Argentina",
   email: "ianvazquezwork@gmail.com",
-  logo: "IV",
+  logo: "/logo-portfolio.png",
   social: {
     github: {
       label: "GitHub",
@@ -18,6 +18,10 @@ export const personal = {
     linkedin: {
       label: "LinkedIn",
       url: "https://www.linkedin.com/in/ian-vazquez-full-stack-developer",
+    },
+    cal: {
+      label: "cal.com",
+      url: "https://cal.com/ian-vazquez-qawvgf",
     },
   },
   bioShort:

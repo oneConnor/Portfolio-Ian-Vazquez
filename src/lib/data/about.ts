@@ -37,3 +37,18 @@ Me entusiasman los proyectos desafiantes, ya sea optimizando sistemas de gestió
 ] as const;
 
 export type AboutSection = (typeof aboutSections)[number];
+
+/**
+ * Contenido principal de la página About.
+ * Es la pestaña por defecto: "Acerca de mi".
+ */
+export const aboutMe = {
+  id: "acerca-de-mi",
+  heading: "Acerca de mi",
+  paragraphs: [
+    `Ofrezco la capacidad de diseñar, empaquetar, desplegar y monitorear aplicaciones Full Stack (Web y Mobile) robustas y escalables de extremo a extremo. Aporto un flujo de trabajo moderno automatizado mediante pipelines de CI/CD, asegurando que cada línea de código lanzada a producción esté testeada, optimizada y lista para soportar alta demanda sin perder estabilidad.`,
+    `Desarrollo APIs REST escalables con Node.js, NestJS, TypeScript y Express junto a automatizaciones en Python y bases de datos SQL / NoSQL, al mismo tiempo que construyo interfaces corporativas, Backoffices y apps móviles nativas con React, Angular y React Native optimizadas mediante Chrome DevTools, complementando todo con la contenerización en Docker, despliegues en AWS y automatización de pipelines CI/CD bajo estándares de Clean Code, testing con Jest, monitoreo con Datadog, gestión ágil con Git / Jira e incremento de productividad mediante IA con Cursor, Claude y Copilot.`,
+    `Me apasiona resolver problemas complejos a través de la ingeniería, transformando ideas abstractas en productos de software estables, eficientes y centrados en el usuario. Disfruto profundamente del diseño de arquitecturas limpias y de la optimización de procesos; ver cómo un pipeline automatizado funciona a la perfección o cómo un refactor mejora drásticamente el rendimiento es lo que me motiva día a día. Además, me entusiasma mantenerme a la vanguardia tecnológica, adoptando herramientas de Inteligencia Artificial y metodologías modernas para elevar constantemente la vara de la calidad técnica.`,
+    `Mi principal diferencial es mi enfoque en la autonomía y el ciclo de vida completo del software. No me limito a escribir código que funcione en mi máquina; diseño soluciones estructuradas con NestJS o Angular bajo patrones de Clean Code, aseguro su estabilidad con pruebas automatizadas en Jest y automatizo su despliegue mediante Docker y pipelines de CI/CD en AWS. Además, integro herramientas de IA avanzada (como Cursor y Claude) no para delegar mi lógica, sino para multiplicar mi velocidad de entrega y optimizar la resolución de problemas técnicos complejos.`,
+  ],
+} as const;

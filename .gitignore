@@ -43,4 +43,15 @@ next-env.d.ts
 
 # bmad and agents
 _bmad/
+_bmad-output/
 .windsurf/
+.agents/
+.opencode/
+
+# docs and presentation (not source code)
+docs/
+presentation.md
+presentation.pptx
+
+# test results
+/test-results/

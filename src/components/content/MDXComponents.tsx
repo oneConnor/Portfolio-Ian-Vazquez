@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CodeBlock } from "@/components/ui/CodeBlock";
+import { Tabs, Tab } from "@/components/ui/tabs";
 import type { MDXComponents as MDXComponentsType } from "mdx/types";
 import type { HTMLAttributes } from "react";
 
@@ -212,6 +213,8 @@ export const MDXComponents = {
   tr: Tr,
   th: Th,
   td: Td,
+  Tabs,
+  Tab,
 } satisfies MDXComponentsType;
 
 export default MDXComponents;

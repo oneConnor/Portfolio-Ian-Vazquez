@@ -1,0 +1,365 @@
+---
+title: "taller-el-novato"
+slug: "taller-el-novato"
+summary: >-
+  Plataforma web de gestión integral para taller de chapa y pintura que
+  transforma el proceso 100% basado en WhatsApp en un sistema digital
+  profesional con solicitudes online, presupuestos automáticos con referencia
+  FAATRA, agendamiento con Google Calendar, bot conversacional de WhatsApp y
+  panel administrativo completo.
+publishedAt: "2026-05-29"
+featured: true
+stack:
+  - Next.js
+  - TypeScript
+  - Tailwind CSS
+  - MongoDB
+  - Mongoose
+  - NextAuth.js
+  - Cloudinary
+  - Redis
+  - Zod
+  - Google Calendar API
+  - WhatsApp API
+  - Pino
+  - React
+  - Vercel
+demoUrl: ""
+repoUrl: "https://github.com/IanVazquez-FullStack/taller-el-novato"
+coverImage: "/projects/taller-el-novato/cover.webp"
+---
+
+import { Tabs, Tab } from '@/components/ui/tabs'
+
+## Contexto
+
+El taller de chapa y pintura **"El Novato"** operaba su relación con clientes enteramente por WhatsApp — presupuestos, fotos de daños, coordinación de turnos, todo en una bandeja de chats sin estructura. Cuando un cliente sufría un accidente, el proceso era manual, estresante y sin trazabilidad.
+
+La plataforma que construí digitaliza ese flujo por completo, permitiendo a los clientes solicitar presupuestos desde casa, seleccionar áreas dañadas en un selector visual del vehículo, recibir un cálculo automático basado en la referencia **FAATRA**, agendar turno en el calendario del taller y recibir confirmaciones por WhatsApp. Del otro lado, el taller gestiona todo desde un dashboard administrativo con métricas, calendario, órdenes de trabajo y control de precios.
+
+## Arquitectura del Sistema
+
+```
+src/
+├── app/
+│   ├── api/                    # 36 endpoints REST
+│   │   ├── auth/               # NextAuth + Google OAuth + credentials
+│   │   ├── requests/           # Solicitudes de presupuesto
+│   │   ├── budget/             # Cálculo de presupuestos FAATRA
+│   │   ├── calendar/           # Disponibilidad de turnos
+│   │   ├── appointments/       # Reserva y gestión de turnos
+│   │   ├── work-orders/        # Órdenes de trabajo
+│   │   ├── upload/             # Imágenes a Cloudinary
+│   │   ├── webhooks/           # WhatsApp + Google Calendar
+│   │   ├── admin/              # Panel administrativo (19 rutas)
+│   │   ├── cron/               # Recordatorios automáticos
+│   │   └── contact/            # Formulario de contacto
+│   ├── admin/                  # Dashboard, solicitudes, turnos, precios
+│   ├── solicitud/              # Formulario multi-paso
+│   ├── servicios/              # Páginas de servicios (4)
+│   └── ...
+├── components/
+│   ├── ui/                     # Input, Button, Card, Badge, Toast...
+│   ├── features/
+│   │   ├── request-form/       # MultiStepForm, VehicleDamageSelector
+│   │   ├── admin/              # Dashboard, WorkOrder, Calendar...
+│   │   ├── calendar/           # AvailabilityCalendar, BookingFlow
+│   │   └── pricing/            # PriceEditor, FAATRAManagement
+├── lib/
+│   ├── models/                 # 9 modelos Mongoose
+│   ├── services/               # 12 servicios de integración
+│   ├── validations/            # Schemas Zod
+│   ├── utils/                  # error-handler, encryption, rate-limiter, retry
+│   ├── jobs/                   # Calendar sync job
+│   ├── hooks/                  # useApiError, useAccessibility
+│   └── constants/              # pricing, vehicle-sections, status, reviews
+└── middleware.ts               # CSP, rate limiting, seguridad
+```
+
+## El Problema y las Decisiones Técnicas
+
+### 1. Motor de Presupuestos con Referencia FAATRA
+
+El negocio del taller usa **paños** como unidad de medida: cada pieza del vehículo equivale a un paño, con excepciones como capot y techo que valen dos. El precio base es de $300 USD por paño, pero el taller necesita actualizar valores según la tabla **FAATRA** (referencia oficial del sector automotor).
+
+Implementé un sistema de pricing en tres capas:
+
+<Tabs>
+  <Tab label="Cálculo de Presupuesto">
+
+```ts
+// src/lib/services/budget-calculation.ts
+export async function calculateBudget(
+  panelIds: string[],
+  options?: { storeBudget?: boolean }
+) {
+  const config = await PricingConfiguration.findOne()
+    ?? { basePricePerPanel: 300, panelExceptions: [], currency: 'USD' }
+
+  const faatraRefs = await FAATRA.findOne()
+  const breakdown: PanelBreakdown[] = panelIds.map(id => ({
+    panelId: id,
+    panelName: PANEL_LABELS[id] ?? id,
+    multiplier: getPanelMultiplier(id),
+    unitPrice: config.basePricePerPanel,
+    subtotal: config.basePricePerPanel * getPanelMultiplier(id),
+  }))
+
+  return {
+    totalAmount: breakdown.reduce((s, b) => s + b.subtotal, 0),
+    panelCount: breakdown.length,
+    breakdown,
+    exceptionsApplied: config.panelExceptions,
+    currency: config.currency,
+    calculationTimeMs: Date.now() - start,
+    faatraReferences: !!fatraRefs,
+  }
+}
+```
+
+  </Tab>
+  <Tab label="Modelo de Precios">
+
+```ts
+// src/lib/models/PricingConfiguration.ts
+const pricingSchema = new Schema({
+  basePricePerPanel: { type: Number, default: 300 },
+  currency: { type: String, default: 'USD' },
+  panelExceptions: [{
+    panelId: String,
+    panelName: String,
+    multiplier: Number,       // capot → 2, techo → 2
+  }],
+})
+```
+
+  </Tab>
+  <Tab label="FAATRA CSV Import">
+
+```ts
+// src/lib/services/faatra-service.ts
+export function parseFAATRACSV(csvString: string): FAATRAReference[] {
+  return csvString
+    .trim().split('\n')
+    .slice(1) // skip header
+    .map(line => {
+      const [panelId, panelName, referencePrice] = line.split(',')
+      return { panelId, panelName, referencePrice: Number(referencePrice) }
+    })
+}
+```
+
+  </Tab>
+</Tabs>
+
+### 2. Selector Visual de Daños
+
+Uno de los desafíos de UX más interesantes fue reemplazar un campo de texto libre ("describa los daños") por un **selector visual interactivo** del vehículo. El cliente ve 5 áreas del auto y toca las partes dañadas, que se marcan en rojo.
+
+Estructuré las vistas del vehículo con **CSS Grid** y botones con overlay semántico:
+
+```tsx
+// src/components/features/request-form/VehicleDamageSelector.tsx
+const VEHICLE_SECTIONS = [
+  { id: 'hood',             label: 'Capot',    gridArea: 'hood' },
+  { id: 'front-left-door',  label: 'Puerta Izq. Del.', gridArea: 'fl-door' },
+  { id: 'front-right-door', label: 'Puerta Der. Del.', gridArea: 'fr-door' },
+  { id: 'rear-left-door',   label: 'Puerta Izq. Tras.', gridArea: 'rl-door' },
+  { id: 'rear-right-door',  label: 'Puerta Der. Tras.', gridArea: 'rr-door' },
+]
+```
+
+Cada sección es un `<button>` con `aria-pressed`, `aria-label`, y overlay visual rojo con checkmark al seleccionarse. La validación Zod exige al menos un área dañada.
+
+### 3. Bot de WhatsApp Conversacional
+
+Implementé una **máquina de estados** para que el bot pueda gestionar el agendamiento completo sin intervención humana:
+
+<Tabs>
+  <Tab label="State Machine">
+
+```ts
+// src/lib/services/whatsapp-bot.ts
+type BookingState =
+  | 'initial'
+  | 'collecting_name'
+  | 'collecting_phone'
+  | 'collecting_vehicle'
+  | 'collecting_damage'
+  | 'selecting_slot'
+  | 'confirming'
+  | 'completed'
+  | 'cancelled'
+
+export function processBookingMessage(
+  session: BookingSession,
+  message: string
+): BotResponse {
+  switch (session.state) {
+    case 'initial':
+      return { text: '¿Cómo te llamás?', newState: 'collecting_name' }
+    case 'collecting_name':
+      return { text: '¿Cuál es tu teléfono?', newState: 'collecting_phone' }
+    case 'collecting_phone':
+      if (!/^\+?54?\d{7,15}$/.test(message))
+        return { text: 'Por favor ingresá un teléfono argentino válido' }
+      return { text: '¿Qué modelo de auto tenés?', newState: 'collecting_vehicle' }
+    // ...
+  }
+}
+```
+
+  </Tab>
+  <Tab label="Detección de Intenciones">
+
+```ts
+// FAQ intent detection
+const FAQ_INTENTS = {
+  presupuesto: /presupuesto|precio|costo|cuanto|tarifa/i,
+  horario: /horario|abierto|cierra|atienden/i,
+  direccion: /direccion|ubicacion|donde|mapa/i,
+  demora: /demora|tiempo|tarda|listo/i,
+  garantia: /garantia|cubre|respaldo/i,
+  seguro: /seguro|aseguradora|compania|tercero/i,
+}
+```
+
+  </Tab>
+</Tabs>
+
+Las sesiones se almacenan en Redis con TTL de 60 minutos, con fallback a memoria en caso de que Redis no esté disponible.
+
+### 4. Sistema de Encriptación a Nivel de Aplicación
+
+Datos sensibles (teléfono, cédula, tokens OAuth) se encriptan con **AES-256-CBC** antes de persistir en MongoDB, usando getters/setters de Mongoose:
+
+```ts
+// src/lib/utils/encryption.ts
+const ALGORITHM = 'aes-256-cbc'
+const KEY = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+const IV_LENGTH = 16
+
+export function encrypt(text: string) {
+  const iv = crypto.randomBytes(IV_LENGTH)
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv)
+  const encrypted = Buffer.concat([cipher.update(text, 'utf-8'), cipher.final()])
+  return { iv: iv.toString('hex'), encryptedData: encrypted.toString('hex') }
+}
+```
+
+### 5. Rate Limiting con Fallback
+
+Implementé rate limiting en Redis con un fallback transparente a memoria. Si Redis falla, el sistema sigue funcionando — registra el evento y permite el tráfico:
+
+```ts
+// src/lib/utils/rate-limiter.ts
+const tiers = { default: 20, strict: 5, webhook: 30, public: 10 }
+
+export async function rateLimit(request: Request, tier = 'default') {
+  const ip = getClientIp(request)
+  const limit = tiers[tier]
+
+  if (redisAvailable) {
+    const [count] = await redis.multi()
+      .incr(`ratelimit:${ip}`)
+      .expire(`ratelimit:${ip}`, 60)
+      .exec()
+    if (count > limit) return rateLimitResponse(limit)
+  } else {
+    // Fallback in-memory
+    const entry = memoryStore.get(ip)
+    if (entry && entry.count > limit) return rateLimitResponse(limit)
+    // ...
+  }
+}
+```
+
+## Modelo de Datos
+
+El sistema tiene **9 modelos Mongoose** que cubren todo el ciclo de vida de una reparación:
+
+| Modelo | Propósito |
+|---|---|
+| `User` | Usuarios con roles (user/admin), Google OAuth tokens encriptados |
+| `Request` | Solicitud de presupuesto con datos personales encriptados, áreas dañadas, fotos, historial de presupuestos |
+| `WorkOrder` | Orden de trabajo con ciclo de vida de 7 estados, historial de cambios, piezas usadas |
+| `Appointment` | Turnos agendados |
+| `Budget` | Presupuestos calculados con desglose por paño |
+| `PricingConfiguration` | Configuración singleton de precios base y excepciones |
+| `FAATRA` | Referencia FAATRA singleton con auditoría de cambios |
+| `LocalCalendar` | Calendario local de respaldo con slots de disponibilidad |
+| `UserCalendarToken` | Tokens OAuth de Google Calendar por usuario |
+
+## API REST
+
+La plataforma expone **36 endpoints REST** organizados por dominio:
+
+```
+  PÚBLICOS
+  GET  /api/health                    Health check
+  POST /api/contact                   Formulario de contacto
+  POST /api/upload                    Subir imagen (auth required)
+  POST /api/requests/submit           Enviar solicitud de presupuesto
+  POST /api/budget/calculate          Calcular presupuesto
+  GET  /api/calendar/availability     Slots disponibles
+  GET  /api/reviews                   Reseñas de Google
+
+  WEBHOOKS
+  GET  /api/webhooks/whatsapp         Verificación WhatsApp
+  POST /api/webhooks/whatsapp         Mensajes entrantes
+  POST /api/webhooks/google-calendar  Notificaciones de calendario
+
+  ADMIN (19 rutas)
+  GET  /api/admin/dashboard/*         Métricas, turnos, órdenes pendientes
+  GET/POST /api/admin/requests        Listar/crear solicitudes
+  PATCH /api/admin/requests/:id/*     Status, budget, cancel, reschedule
+  GET/POST /api/admin/work-orders     Listar/crear órdenes de trabajo
+  POST /api/admin/*/schedule          Agendar en calendario
+  GET/PUT /api/admin/pricing          Configuración de precios
+  GET/POST /api/admin/faatra          Referencias FAATRA
+  POST /api/admin/calendar/*          Sincronización
+```
+
+## Flujo Completo del Usuario
+
+```
+DESCUBRIMIENTO → SOLICITUD → PRESUPUESTO → TURNO → EVALUACIÓN → ORDEN → REPARACIÓN → ENTREGA
+```
+
+**María (cliente):**
+1. Llega al sitio desde Google, ve antes/después y reseñas
+2. Inicia sesión con Google OAuth (un click) o se registra
+3. Completa formulario multi-paso de 4 etapas: datos personales → vehículo → daños (selector visual + fotos) → revisión
+4. Recibe presupuesto aproximado instantáneo basado en FAATRA
+5. Selecciona turno en el calendario (slots en vivo desde Google Calendar)
+6. Recibe confirmación por WhatsApp
+7. Recibe recordatorios automáticos 24h y 2h antes
+
+**Juan (técnico):**
+1. Ve dashboard con turno más cercano y métricas del día
+2. Revisa solicitud entrante con fotos y selector de daños
+3. Acepta turno → cliente recibe WhatsApp automático
+4. Evalúa el auto en persona, ajusta presupuesto final desde el panel
+5. Genera orden de trabajo y la mueve por 7 estados (pendiente → programado → en progreso → en pintura → control de calidad → completado → entregado)
+6. Genera PDF profesional para aseguradoras con formato A/B/C
+7. Gestiona precios base, excepciones y valores FAATRA desde el panel
+
+## Capturas de Pantalla
+
+![Dashboard Administrativo](/projects/taller-el-novato/dashboard.webp)
+![Formulario Multi-paso](/projects/taller-el-novato/formulario.webp)
+![Selector Visual de Daños](/projects/taller-el-novato/selector-danos.webp)
+
+## Lecciones Aprendidas
+
+- **Fallbacks primero, features después**: Implementar rate limiting con fallback a memoria (si Redis cae), calendario local de respaldo (si Google Calendar falla), y notificaciones manuales (si WhatsApp falla) nos salvó en múltiples ocasiones durante desarrollo. Cada integración crítica debe tener su plan de contingencia documentado.
+
+- **Encriptación con getters/setters de Mongoose**: Aplicar encriptación AES-256 a nivel de campo usando los getters y setters nativos de Mongoose fue una decisión que mantuvo el código de negocio limpio — los servicios nunca manejan lógica de encriptación, solo leen y escriben strings.
+
+- **Selector visual > texto libre**: El selector de 5 vistas del vehículo con CSS Grid y botones semánticos no solo mejoró la calidad de los datos recibidos (el técnico ve exactamente qué áreas están dañadas), sino que redujo la fricción del formulario. La validación Zod de "al menos un área" asegura solicitudes completas.
+
+- **Un solo monolito, pero modular**: La arquitectura de service layer con dominios separados (auth/, calendar/, whatsapp/, images/, pdf/, pricing/) dentro de `src/lib/services/` permitió avanzar rápido sin perder la capacidad de extraer microservicios en el futuro. Cada servicio tiene su propia interfaz, manejo de errores y tests.
+
+- **Máquina de estados para el bot de WhatsApp**: Implementar el bot con una state machine explícita (`initial → collecting_name → collecting_phone → …`) hizo que el flujo conversacional fuera predecible, testeable y fácil de extender. Las sesiones en Redis con TTL evitan que sesiones abandonadas consuman memoria.
+
+- **20 mil líneas de TypeScript, 55 componentes, 33 días**: El ritmo fue posible gracias a Zod para validación en frontend y backend (errores atrapados en compilación, no en producción), al tipado estricto de TypeScript y a los componentes reutilizables del design system con dark mode.

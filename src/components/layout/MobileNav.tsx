@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { navigationLinks } from "@/components/layout/Navigation";
 import { personal } from "@/lib/data/personal";
@@ -42,8 +43,14 @@ export function MobileNav() {
           className="w-full max-w-xs border-border bg-background p-6"
         >
           <div className="flex flex-col gap-6">
-            <SheetTitle className="text-h3 font-bold text-foreground">
-              {personal.logo}
+            <SheetTitle className="flex items-center justify-center text-h3 font-bold text-foreground">
+              <Image
+                src={personal.logo}
+                alt={personal.displayName}
+                width={120}
+                height={120}
+                className="rounded-full"
+              />
             </SheetTitle>
             <nav aria-label="Navegación principal móvil">
               <ul className="flex flex-col gap-2 pt-8">
